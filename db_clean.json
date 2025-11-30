@@ -4,14 +4,14 @@
       "id": 1,
       "username": "jason",
       "password": "jason",
-      "token": "d121f29f-580e-4210-87c4-95f252088065",
+      "token": "0db5e8bd-6beb-4967-afad-cd5f6d703d91",
       "created_at": 1764515720.609389
     },
     {
       "id": 2,
       "username": "nina",
       "password": "nina",
-      "token": "c7609a1a-1094-411e-9a3d-57ed1446cc4e",
+      "token": "d28d7b0b-4ea5-49a9-9519-c106c15b45a3",
       "created_at": 1764515844.64815
     }
   ],
@@ -20,8 +20,15 @@
       "id": 1,
       "username": "hidilao",
       "password": "hidilao",
-      "token": "205a19dc-4b3d-47a2-a763-2e0b292c8aaf",
+      "token": "08778504-908b-4bbb-809d-53f1b996864e",
       "created_at": 1764516227.905618
+    },
+    {
+      "id": 2,
+      "username": "jason",
+      "password": "jason",
+      "token": "3666889c-c606-4220-8c49-21279028fadc",
+      "created_at": 1764521544.5573146
     }
   ],
   "rooms": [
@@ -52,6 +59,27 @@
       "host_name": "jason",
       "status": "idle",
       "users": [
+        2
+      ]
+    },
+    {
+      "id": 4,
+      "name": "jason's Room",
+      "host_user_id": 1,
+      "host_name": "jason",
+      "status": "idle",
+      "users": [
+        2
+      ]
+    },
+    {
+      "id": 5,
+      "name": "jason's Room",
+      "host_user_id": 1,
+      "host_name": "jason",
+      "status": "idle",
+      "users": [
+        1,
         2
       ]
     }
@@ -97,8 +125,8 @@
   "gamelogs": [],
   "nexts": {
     "player": 3,
-    "developer": 2,
-    "room": 4,
+    "developer": 3,
+    "room": 6,
     "gamelog": 1
   }
 }

@@ -172,6 +172,7 @@ def main():
             net_sock = socket.create_connection(
                 (args.host, args.port), timeout=2.0)
             print("[Client] Connected to game server")
+            net_sock.settimeout(None)
             break
         except Exception as e:
             print(f"[Client] Connection failed ({i+1}/5): {e}")

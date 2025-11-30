@@ -1,0 +1,30 @@
+{
+  "size": 15591,
+  "version": "1.0.0",
+  "execution": {
+    "server": {
+      "executable": "python",
+      "script": "server/game_server.py",
+      "arguments": {
+        "port": "--port",
+        "room_id": "--room-id",
+        "users": "--users",
+        "mode": "--mode",
+        "drop_ms": "--drop-ms"
+      },
+      "custom_args": {
+        "host": "0.0.0.0"
+      }
+    },
+    "client": {
+      "executable": "python",
+      "script": "client/game_client.py",
+      "arguments": {
+        "ip": "--host",
+        "port": "--port",
+        "user_id": "--user-id",
+        "role": "--role"
+      }
+    }
+  }
+}

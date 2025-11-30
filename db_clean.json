@@ -1,0 +1,104 @@
+{
+  "players": [
+    {
+      "id": 1,
+      "username": "jason",
+      "password": "jason",
+      "token": "d121f29f-580e-4210-87c4-95f252088065",
+      "created_at": 1764515720.609389
+    },
+    {
+      "id": 2,
+      "username": "nina",
+      "password": "nina",
+      "token": "c7609a1a-1094-411e-9a3d-57ed1446cc4e",
+      "created_at": 1764515844.64815
+    }
+  ],
+  "developers": [
+    {
+      "id": 1,
+      "username": "hidilao",
+      "password": "hidilao",
+      "token": "205a19dc-4b3d-47a2-a763-2e0b292c8aaf",
+      "created_at": 1764516227.905618
+    }
+  ],
+  "rooms": [
+    {
+      "id": 1,
+      "name": "jason's Room",
+      "host_user_id": 1,
+      "host_name": "jason",
+      "status": "idle",
+      "users": [
+        2
+      ]
+    },
+    {
+      "id": 2,
+      "name": "jason's Room",
+      "host_user_id": 1,
+      "host_name": "jason",
+      "status": "idle",
+      "users": [
+        2
+      ]
+    },
+    {
+      "id": 3,
+      "name": "jason's Room",
+      "host_user_id": 1,
+      "host_name": "jason",
+      "status": "idle",
+      "users": [
+        2
+      ]
+    }
+  ],
+  "games": [
+    {
+      "name": "Tetris_Battle",
+      "created_at": 1764515790.7412164,
+      "author": "hidilao",
+      "version": "1.0.0",
+      "description": "經典雙人俄羅斯方塊對戰",
+      "file_path": "server_storage\\games\\Tetris_Battle\\1.0.0.zip",
+      "execution": {
+        "server": {
+          "executable": "python",
+          "script": "server/game_server.py",
+          "arguments": {
+            "port": "--port",
+            "room_id": "--room-id",
+            "users": "--users",
+            "mode": "--mode",
+            "drop_ms": "--drop-ms"
+          },
+          "custom_args": {
+            "host": "0.0.0.0"
+          }
+        },
+        "client": {
+          "executable": "python",
+          "script": "client/game_client.py",
+          "arguments": {
+            "ip": "--host",
+            "port": "--port",
+            "user_id": "--user-id",
+            "role": "--role"
+          }
+        }
+      },
+      "min_players": 2,
+      "max_players": 2
+    }
+  ],
+  "gamelogs": [],
+  "nexts": {
+    "player": 3,
+    "developer": 2,
+    "room": 4,
+    "gamelog": 1
+  }
+}

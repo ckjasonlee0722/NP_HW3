@@ -1,3 +1,4 @@
+# server/game_server.py
 from typing import Dict, List, Optional, Tuple
 import time
 import threading
@@ -10,7 +11,7 @@ import argparse
 import sys
 import os
 
-# 允許從套件外相對匯入（保持你原有結構）
+# 允許從套件外相對匯入
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
     from tetris_engine import (
@@ -18,7 +19,6 @@ try:
         EngineSnapshot, GravityPlan, make_bag_rng
     )
 except Exception:
-    # 若以套件形式執行
     sys.path.insert(0, os.path.dirname(
         os.path.dirname(os.path.abspath(__file__))))
     from game_server.tetris_engine import (
@@ -98,14 +98,17 @@ class GameRoom:
         self.reason = ""
 
         rng = make_bag_rng(seed)
-        self.engines: List[TetrisEngine] = [TetrisEngine(
-            bag_rng=rng()), TetrisEngine(bag_rng=rng())]
-        self.lines_total = [0, 0]
-        self.scores = [0, 0]
-        self.levels = [1, 1]
+        self.engines: List[TetrisEngine] = [
+            TetrisEngine(bag_rng=rng()) for _ in users]
+
+        self.lines_total = [0] * len(users)
+        self.scores = [0] * len(users)
+        self.levels = [1] * len(users)
         self.gravity = GravityPlan(mode="fixed", drop_ms=drop_ms)
 
     def apply_input(self, side: int, action: str):
+        if side >= len(self.engines):
+            return
         eng = self.engines[side]
         if action == "LEFT":
             eng.move(-1)
@@ -125,8 +128,7 @@ class GameRoom:
             eng.hold()
 
     def tick_drop(self, now_ms: int):
-        for i in (0, 1):
-            eng = self.engines[i]
+        for i, eng in enumerate(self.engines):
             if eng.top_out:
                 continue
             cleared, score_delta = eng.gravity_step()
@@ -135,50 +137,63 @@ class GameRoom:
 
     def check_game_over(self, now: float):
         if self.mode == "survival":
-            p1_out = self.engines[0].top_out
-            p2_out = self.engines[1].top_out
-            if p1_out or p2_out:
-                self.over = True
-                if p1_out and p2_out:
-                    self.winner, self.reason = "draw", "both topped"
-                elif p1_out:
-                    self.winner, self.reason = "P2", "P1 topped"
-                else:
-                    self.winner, self.reason = "P1", "P2 topped"
+            alive_indices = [i for i, eng in enumerate(
+                self.engines) if not eng.top_out]
+
+            if len(self.engines) > 1:
+                # 多人模式：剩 1 人存活或全滅則結束
+                if len(alive_indices) <= 1:
+                    self.over = True
+                    if len(alive_indices) == 1:
+                        w_idx = alive_indices[0]
+                        self.winner = f"P{w_idx+1}"
+                        self.reason = "Last man standing"
+                    else:
+                        self.winner = "draw"
+                        self.reason = "All topped out"
+            else:
+                # 單人模式：死掉就結束
+                if len(alive_indices) == 0:
+                    self.over = True
+                    self.winner = "None"
+                    self.reason = "Topped out"
+
         elif self.mode == "timed":
             if self.start_ts is None:
                 self.start_ts = now
             if now - self.start_ts >= self.timed_seconds:
                 self.over = True
-                l1, l2 = self.lines_total[0], self.lines_total[1]
-                if l1 > l2:
-                    self.winner, self.reason = "P1", "more lines"
-                elif l2 > l1:
-                    self.winner, self.reason = "P2", "more lines"
-                else:
-                    s1, s2 = self.scores[0], self.scores[1]
-                    if s1 > s2:
-                        self.winner, self.reason = "P1", "more score"
-                    elif s2 > s1:
-                        self.winner, self.reason = "P2", "more score"
-                    else:
-                        self.winner, self.reason = "draw", "tie"
-        elif self.mode == "lines":
-            t = self.target_lines
-            if self.lines_total[0] >= t or self.lines_total[1] >= t:
-                self.over = True
-                if self.lines_total[0] > self.lines_total[1]:
-                    self.winner, self.reason = "P1", "reach target lines"
-                elif self.lines_total[1] > self.lines_total[0]:
-                    self.winner, self.reason = "P2", "reach target lines"
-                else:
-                    self.winner, self.reason = "draw", "both reach target"
+                max_s = -1
+                w_idx = -1
+                for i, s in enumerate(self.scores):
+                    if s > max_s:
+                        max_s = s
+                        w_idx = i
+                    elif s == max_s:
+                        w_idx = -1
+                self.winner = f"P{w_idx+1}" if w_idx != -1 else "draw"
+                self.reason = "Time's up"
 
     def build_snapshot(self, side: int, now_ms: int) -> dict:
         me = self.engines[side]
-        opp = self.engines[1 - side]
-        snap_me: EngineSnapshot = me.snapshot()
-        snap_opp: EngineSnapshot = opp.snapshot(minified=False)
+        snap_me = me.snapshot()
+
+        opponents = []
+        for i, eng in enumerate(self.engines):
+            if i == side:
+                continue
+            snap_opp = eng.snapshot(minified=False)
+            opponents.append({
+                "userId": self.users[i],
+                "side": i,
+                "score": self.scores[i],
+                "lines": self.lines_total[i],
+                "boardRLE": rle_encode_board(snap_opp.board),
+                "board": snap_opp.board,
+                "active": snap_opp.active,
+                "alive": not eng.top_out
+            })
+
         return {
             "type": "SNAPSHOT",
             "tick": now_ms,
@@ -191,20 +206,13 @@ class GameRoom:
             "next": snap_me.next3,
             "boardRLE": rle_encode_board(snap_me.board),
             "board": snap_me.board,
-            "opponent": {
-                "score": self.scores[1 - side],
-                "lines": self.lines_total[1 - side],
-                "boardRLE": rle_encode_board(snap_opp.board),
-                "board": snap_opp.board,
-                "active": snap_opp.active,
-            },
+            "opponents": opponents,
             "gravityPlan": {"mode": self.gravity.mode, "dropMs": self.gravity.drop_ms},
             "at": now_ms,
         }
 
 
-def accept_thread(server_sock: socket.socket, expect_users: List[int],
-                  join_queue: List[Tuple], stop_flag: threading.Event):
+def accept_thread(server_sock, expect_users, join_queue, stop_flag):
     server_sock.listen(8)
     while not stop_flag.is_set():
         try:
@@ -212,68 +220,53 @@ def accept_thread(server_sock: socket.socket, expect_users: List[int],
             conn, addr = server_sock.accept()
         except socket.timeout:
             continue
-        except Exception:
-            if not stop_flag.is_set():
-                raise
+        except:
             break
-        try:
-            hello = recv_message(conn)
-            if hello.get("type") != "HELLO":
-                raise ClosedError("expect HELLO")
-            user_id = int(hello.get("userId"))
-            role = hello.get("role") or "player"
-            if role == "player" and user_id not in expect_users:
-                raise ClosedError("unexpected user")
-            join_queue.append((conn, addr, user_id, role))
-        except Exception as e:
-            try:
-                send_message(conn, {"type": "ERROR", "message": f"{e}"})
-            except Exception:
-                pass
-            try:
-                conn.close()
-            except Exception:
-                pass
 
+        def handle_hello(c, a):
+            try:
+                c.settimeout(3.0)
+                hello = recv_message(c)
+                c.settimeout(None)
 
-def _pick_public_host(bind_host: str, public_host_arg: Optional[str]) -> str:
-    # 1) 明確參數 > 2) 環境變數 > 3) 自動偵測對外 IP > 4) 退回綁定位址
-    if public_host_arg:
-        return public_host_arg
-    env = os.environ.get("PUBLIC_HOST")
-    if env:
-        return env
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        if ip:
-            return ip
-    except Exception:
-        pass
-    return bind_host
+                if hello.get("type") != "HELLO":
+                    raise ClosedError("expect HELLO")
+
+                user_id = int(hello.get("userId"))
+                role = hello.get("role") or "player"
+
+                # [修改] 寬鬆檢查：只要是原本名單上的人都接受
+                if role == "player" and user_id not in expect_users:
+                    # 這裡可以選擇報錯，或者印個警告就好
+                    print(f"[Accept] Warning: Unexpected user {user_id}")
+
+                join_queue.append((c, a, user_id, role))
+                print(f"[Accept] Accepted user {user_id} from {a}")
+            except Exception as e:
+                print(f"[Accept] Error with {a}: {e}")
+                try:
+                    c.close()
+                except:
+                    pass
+
+        threading.Thread(target=handle_hello, args=(
+            conn, addr), daemon=True).start()
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="0.0.0.0",
-                        help="bind address for game server")
+    parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, required=True)
-    parser.add_argument("--users", required=True,
-                        help="comma separated user ids: e.g. 1,2")
+    parser.add_argument("--users", required=True)
     parser.add_argument("--room-id", type=int, required=True)
-    parser.add_argument(
-        "--mode", choices=["survival", "timed", "lines"], default="survival")
+    parser.add_argument("--mode", default="survival")
     parser.add_argument("--drop-ms", type=int, default=500)
     parser.add_argument("--timed-seconds", type=int, default=60)
     parser.add_argument("--target-lines", type=int, default=20)
     parser.add_argument("--lobby-host", default="127.0.0.1")
     parser.add_argument("--lobby-port", type=int, default=10002)
-    parser.add_argument("--seed", type=int, default=None,
-                        help="PRNG seed; if omitted, server will auto-generate")
-    parser.add_argument("--public-host", default=None,
-                        help="hostname/IP printed in client commands")
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--public-host", default=None)
 
     args = parser.parse_args()
 
@@ -295,14 +288,13 @@ def main():
             except Exception:
                 pass
         except Exception:
-            pass  # best-effort
+            pass
 
     users = [int(x) for x in args.users.split(",")]
-    if len(users) != 2:
-        raise SystemExit("Need exactly two users")
-
     seed = args.seed if args.seed is not None else (
         int(time.time() * 1000) & 0x7FFFFFFF)
+
+    # 預先建立房間，但後面可能會因為人數不足而重建
     room = GameRoom(
         users=users, mode=args.mode, drop_ms=args.drop_ms,
         timed_seconds=args.timed_seconds, target_lines=args.target_lines, seed=seed
@@ -313,29 +305,8 @@ def main():
     srv.bind((args.host, args.port))
     print(
         f"[GameServer] listening on {args.host}:{args.port} "
-        f"room={args.room_id} mode={args.mode} seed={seed} dropMs={args.drop_ms}"
+        f"room={args.room_id} users={len(users)}"
     )
-
-    public_host = _pick_public_host(args.host, args.public_host)
-
-    p1, p2 = args.users.split(",")[0], args.users.split(",")[1]
-    print("\n=== paste these in two terminals ===")
-    print(
-        f"python -m clients.game_client --host {public_host} --port {args.port} --user-id {p1}")
-    print(
-        f"python -m clients.game_client --host {public_host} --port {args.port} --user-id {p2}")
-    print("\n[spectator] (optional)")
-    print(
-        f"python -m clients.spectator_client --host {public_host} --port {args.port}")
-    print("\n[server_cmd]")
-    print(
-        "python -m game_server.game_server "
-        f"--host {args.host} --port {args.port} --users {args.users} --room-id {args.room_id} "
-        f"--mode {args.mode} --drop-ms {args.drop_ms} --timed-seconds {args.timed_seconds} "
-        f"--target-lines {args.target_lines} --lobby-host {args.lobby_host} --lobby-port {args.lobby_port} "
-        f"--public-host {public_host}"
-    )
-    print()
 
     stop_flag = threading.Event()
     join_queue: List[Tuple] = []
@@ -346,30 +317,41 @@ def main():
     players: Dict[int, PlayerConn] = {}
     spectators: List[PlayerConn] = []
 
-    # 等待兩位玩家接入；觀戰者可隨時進來
-    while len(players) < 2:
+    # === [關鍵修改] 等待玩家，但加入 10 秒逾時機制 ===
+    wait_start = time.time()
+    WAIT_LIMIT = 10.0  # 秒
+
+    print(f"[GameServer] Waiting for players... (Timeout: {WAIT_LIMIT}s)")
+
+    while len(players) < len(users):
+        # 逾時檢查
+        if time.time() - wait_start > WAIT_LIMIT:
+            print(
+                "[GameServer] ⚠️ Wait timeout! Starting game with connected players only.")
+            break
+
         while join_queue:
             conn, addr, uid, role = join_queue.pop(0)
             try:
                 if role == "player":
                     if uid in players:
-                        send_message(
-                            conn, {"type": "ERROR", "message": "duplicate user"})
                         conn.close()
                         continue
                     p = PlayerConn(conn, addr, uid, role)
                     players[uid] = p
-                    role_name = "P1" if uid == users[0] else "P2"
+
+                    # 這裡暫時先算一個 index，之後可能會變
+                    idx = users.index(uid) if uid in users else len(players)-1
+
                     send_message(conn, {
                         "type": "WELCOME",
                         "version": WELCOME_VERSION,
-                        "role": role_name,
+                        "role": f"P{idx+1}",  # Client 可能會收到 P2，這沒關係
                         "seed": room.seed,
                         "bagRule": room.bag_rule,
                         "gravityPlan": {"mode": room.gravity.mode, "dropMs": room.gravity.drop_ms}
                     })
-                    print(
-                        f"[GameServer] user {uid} connected as {role_name} from {addr}")
+                    print(f"[GameServer] user {uid} connected")
                 else:
                     sp = PlayerConn(conn, addr, uid, role)
                     spectators.append(sp)
@@ -381,7 +363,7 @@ def main():
                         "bagRule": room.bag_rule,
                         "gravityPlan": {"mode": room.gravity.mode, "dropMs": room.gravity.drop_ms}
                     })
-                    print(f"[GameServer] spectator from {addr}")
+                    print(f"[GameServer] spectator connected")
             except Exception:
                 try:
                     conn.close()
@@ -389,26 +371,49 @@ def main():
                     pass
         time.sleep(0.05)
 
-    side_of = {users[0]: 0, users[1]: 1}
-    conns = [players[users[0]], players[users[1]]]
+    # === [關鍵修改] 重新確認實際參與的玩家 ===
+    # 過濾出真正連線的 user list
+    actual_users = [u for u in users if u in players]
 
-    # 倒數（10 秒）
+    # 如果原本預期的人沒來，但有不在名單上的人連進來了(例外狀況)，也加進去
+    for p_id in players:
+        if p_id not in actual_users:
+            actual_users.append(p_id)
+
+    if not actual_users:
+        print("[GameServer] No players connected. Shutting down.")
+        stop_flag.set()
+        return
+
+    # 如果人數變少了，我們必須重新建立 GameRoom
+    # 否則原本的 GameRoom 會期待 2 個人，造成「1人存活 -> 直接判定勝利結束」
+    if len(actual_users) != len(users):
+        print(
+            f"[GameServer] Re-initializing room for {len(actual_users)} players.")
+        users = actual_users
+        room = GameRoom(
+            users=users,  # 只放入實際存在的人
+            mode=args.mode,
+            drop_ms=args.drop_ms,
+            timed_seconds=args.timed_seconds,
+            target_lines=args.target_lines,
+            seed=seed
+        )
+
+    # 建立連線列表，順序必須跟 room.users (也就是 actual_users) 一致
+    side_of = {u: i for i, u in enumerate(users)}
+    conns = [players[u] for u in users]
+
+    # 倒數
     print("[GameServer] Starting countdown...")
-    for c in conns + spectators:
-        try:
-            send_message(c.sock, {"type": "COUNTDOWN", "seconds": 10})
-        except Exception:
-            pass
-    for countdown in range(10, 0, -1):
-        print(f"[GameServer] {countdown}...")
-        time.sleep(1.0)
+    for i in range(3, 0, -1):  # 改成 3 秒比較快
         for c in conns + spectators:
             try:
-                send_message(
-                    c.sock, {"type": "COUNTDOWN", "seconds": countdown - 1})
+                send_message(c.sock, {"type": "COUNTDOWN", "seconds": i})
             except Exception:
                 pass
-    print("[GameServer] GO!")
+        time.sleep(1.0)
+
     for c in conns + spectators:
         try:
             send_message(c.sock, {"type": "START"})
@@ -419,14 +424,14 @@ def main():
     last_broadcast = 0.0
     SNAPSHOT_INTERVAL_MS = 60.0
 
-    for i in (0, 1):
+    for i in range(len(users)):
         room.engines[i].spawn_if_needed()
 
     while not room.over:
         now = time.time()
         now_ms = int(now * 1000)
 
-        # 處理玩家/觀戰者訊息
+        # Handle Inputs
         rlist = [c.sock for c in conns if c.alive] + \
             [s.sock for s in spectators if s.alive]
         if rlist:
@@ -437,55 +442,54 @@ def main():
             for rs in rl:
                 try:
                     msg = recv_message(rs)
+                    t = msg.get("type")
+                    if t == "INPUT":
+                        uid = int(msg.get("userId"))
+                        act = msg.get("action")
+                        if uid in side_of:
+                            room.apply_input(side_of[uid], act)
+                    elif t == "PLUGIN" or t == "CHAT":
+                        for c in conns + spectators:
+                            if c.alive:
+                                try:
+                                    send_message(c.sock, msg)
+                                except:
+                                    pass
                 except Exception:
-                    who = None
                     for idx, pc in enumerate(conns):
                         if pc.sock is rs:
-                            who = idx
                             pc.close()
-                    if who is not None and not room.over:
-                        room.over = True
-                        room.winner = "P2" if who == 0 else "P1"
-                        room.reason = "opponent disconnected"
-                    continue
+                            # 斷線視為輸掉
+                            room.engines[idx].top_out = True
 
-                if msg.get("type") == "INPUT":
-                    uid = int(msg.get("userId"))
-                    action = msg.get("action")
-                    if uid in side_of:
-                        room.apply_input(side_of[uid], action)
-
-        # 重力下落
+        # Gravity
         if now_ms - last_drop >= room.drop_ms:
             room.tick_drop(now_ms)
             last_drop = now_ms
 
-        # 週期性廣播 SNAPSHOT
+        # Snapshot
         if now_ms - last_broadcast >= SNAPSHOT_INTERVAL_MS:
             for idx, pc in enumerate(conns):
                 if pc.alive:
                     snap = room.build_snapshot(idx, now_ms)
-                    send_message(pc.sock, snap)
-            for sp in spectators:
-                if sp.alive:
-                    snap = room.build_snapshot(0, now_ms)  # 觀戰者看 P1 視角
-                    send_message(sp.sock, snap)
+                    try:
+                        send_message(pc.sock, snap)
+                    except Exception:
+                        pass
             last_broadcast = now_ms
 
-        # 判定結束
         room.check_game_over(now)
         time.sleep(0.005)
 
-    # 結果封包
+    # Result
+    scores_dict = {f"P{i+1}": s for i, s in enumerate(room.scores)}
     result = {
         "type": "GAME_OVER",
         "winner": room.winner,
         "reason": room.reason,
-        "score": {"P1": room.scores[0], "P2": room.scores[1]},
-        "lines": {"P1": room.lines_total[0], "P2": room.lines_total[1]},
+        "score": scores_dict
     }
 
-    # 廣播結果
     for pc in conns + spectators:
         if pc.alive:
             try:
@@ -493,19 +497,14 @@ def main():
             except Exception:
                 pass
 
-    # 回報 Lobby
     report_to_lobby(result)
-
-    time.sleep(2.5)
-
-    for pc in conns + spectators:
-        pc.close()
-    # 關閉監聽
+    time.sleep(2.0)
+    stop_flag.set()
     try:
         srv.close()
     except Exception:
         pass
-    print(f"[GameServer] over winner={room.winner} reason={room.reason}")
+    print(f"[GameServer] Game Over. Winner: {room.winner}")
 
 
 if __name__ == "__main__":

@@ -49,10 +49,8 @@ class DeveloperClient:
         if not conn:
             return
         try:
-            send_message(conn, {
-                "action": "auth_register",
-                "data": {"username": user, "password": pwd, "role": "developer"}
-            })
+            send_message(conn, {"action": "auth_register", "data": {
+                         "username": user, "password": pwd, "role": "developer"}})
             resp = recv_message(conn)
             if resp["status"] == "success":
                 print(f"[成功] 註冊成功 ID: {resp['data']['id']}")
@@ -65,15 +63,12 @@ class DeveloperClient:
         print("\n=== 🔑 開發者登入 ===")
         user = self._get_input("帳號: ")
         pwd = self._get_input("密碼: ")
-
         conn = self.connect()
         if not conn:
             return False
         try:
-            send_message(conn, {
-                "action": "auth_login",
-                "data": {"username": user, "password": pwd, "role": "developer"}
-            })
+            send_message(conn, {"action": "auth_login", "data": {
+                         "username": user, "password": pwd, "role": "developer"}})
             resp = recv_message(conn)
             if resp["status"] == "success":
                 data = resp["data"]
@@ -115,11 +110,14 @@ class DeveloperClient:
                 print(f"\n=== 📦 上架遊戲列表 ===")
                 print(f"{'Name':<20} {'Ver':<10} {'Author'}")
                 print("-" * 40)
-                for g in games:
-                    mark = "*" if g.get("author") == self.username else " "
-                    print(
-                        f"{mark}{g['name']:<19} v{g['version']:<9} {g.get('author', '?')}")
-                print("(* 代表是您上架的遊戲)")
+                my_games = [g for g in games if g.get(
+                    "author") == self.username]
+                if not my_games:
+                    print("(您尚未上架任何遊戲)")
+                else:
+                    for g in my_games:
+                        print(
+                            f"{g['name']:<20} v{g['version']:<10} {g.get('author')}")
             else:
                 print(f"[失敗] {resp.get('message')}")
         finally:
@@ -139,31 +137,95 @@ class DeveloperClient:
                     zf.write(file_path, archive_name)
         return mem_file.getvalue()
 
-    def upload_game(self):
-        path = self._get_input("\n請輸入遊戲專案路徑 (例如 ./t): ")
-        if not path or not os.path.exists(path):
-            print("[錯誤] 路徑不存在")
-            return
-
-        config_path = os.path.join(path, "game_config.json")
+    def _validate_game_config(self, base_path):
+        config_path = os.path.join(base_path, "game_config.json")
         if not os.path.exists(config_path):
-            print(f"[錯誤] 找不到 {config_path}")
-            return
+            return False, "找不到 game_config.json"
 
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
+        except Exception as e:
+            return False, f"game_config.json 格式錯誤: {e}"
 
-            meta = config.get("meta", {}).copy()
-            meta["execution"] = config.get("execution", {})
-            meta["author"] = self.username
+        meta = config.get("meta", {})
+        if not meta.get("game_name") or not meta.get("version"):
+            return False, "meta 中缺少 game_name 或 version"
 
-            game_name = meta.get("game_name")
-            version = meta.get("version")
+        execution = config.get("execution", {})
+        srv = execution.get("server", {})
+        srv_script = srv.get("script")
+        if not srv_script:
+            return False, "execution.server 缺少 script 定義"
+        if not os.path.exists(os.path.join(base_path, srv_script)):
+            return False, f"找不到 Server Script 檔案: {srv_script}"
 
-            print(f"[系統] 正在打包 {game_name} v{version} ...")
+        cli = execution.get("client", {})
+        cli_script = cli.get("script")
+        if not cli_script:
+            return False, "execution.client 缺少 script 定義"
+        if not os.path.exists(os.path.join(base_path, cli_script)):
+            return False, f"找不到 Client Script 檔案: {cli_script}"
+
+        return True, config
+
+    # [新增] 版本號自動增加邏輯
+    def _increment_version(self, version_str):
+        try:
+            parts = version_str.split('.')
+            if len(parts) >= 3:
+                # 1.0.0 -> 1.0.1
+                parts[-1] = str(int(parts[-1]) + 1)
+                return ".".join(parts)
+            else:
+                return version_str + ".1"
+        except:
+            return version_str  # 解析失敗就回傳原值
+
+    def upload_game(self):
+        path = self._get_input("\n請輸入遊戲專案路徑 (例如 .): ")
+        if not path:
+            path = "."  # 預設當前目錄
+
+        if not os.path.exists(path):
+            print("[錯誤] 路徑不存在")
+            return
+
+        # 1. 驗證並讀取設定檔
+        valid, result = self._validate_game_config(path)
+        if not valid:
+            print(f"[錯誤] 驗證失敗: {result}")
+            return
+
+        config = result
+        current_ver = config["meta"]["version"]
+
+        # [新增] 詢問自動更新版本
+        next_ver = self._increment_version(current_ver)
+        print(f"\n目前版本: v{current_ver}")
+        ask = self._get_input(f"是否自動更新版本至 v{next_ver}? (Y/n): ").lower()
+        if ask != 'n':
+            # 更新記憶體中的 config
+            config["meta"]["version"] = next_ver
+            # 寫回檔案 (這樣 zip 才會包到新版本)
+            config_path = os.path.join(path, "game_config.json")
+            try:
+                with open(config_path, "w", encoding="utf-8") as f:
+                    json.dump(config, f, ensure_ascii=False, indent=4)
+                print(f"[系統] 已更新設定檔版本為 v{next_ver}")
+            except Exception as e:
+                print(f"[警告] 無法寫入設定檔，將使用舊版本上傳: {e}")
+
+        # 準備上傳資料
+        meta = config.get("meta", {}).copy()
+        meta["execution"] = config.get("execution", {})
+        meta["author"] = self.username
+
+        print(f"[系統] 正在打包 {meta['game_name']} v{meta['version']} ...")
+
+        try:
+            # 這裡打包時會讀取到剛剛更新過的 game_config.json
             zip_data = self.zip_directory(path)
-
             conn = self.connect()
             if not conn:
                 return
@@ -182,25 +244,46 @@ class DeveloperClient:
                 print(f"[失敗] {resp.get('message')}")
 
             conn.close()
-
         except Exception as e:
             print(f"[錯誤] {e}")
+
+    def delete_game(self):
+        self.list_my_games()
+        name = self._get_input("\n請輸入要下架的遊戲名稱: ")
+        if not name:
+            return
+        conn = self.connect()
+        if not conn:
+            return
+        try:
+            send_message(conn, {
+                "action": "game_delete",
+                "data": {"game_name": name, "author": self.username}
+            })
+            resp = recv_message(conn)
+            if resp["status"] == "success":
+                print(f"[成功] 遊戲 '{name}' 已下架")
+            else:
+                print(f"[失敗] {resp.get('message')}")
+        finally:
+            conn.close()
 
     def run(self):
         if not self.auth_loop():
             return
-
         while True:
             print(f"\n=== 開發者: {self.username} ===")
             print("1. 遊戲列表 (List Games)")
             print("2. 上架/更新遊戲 (Upload/Update)")
+            print("3. 下架遊戲 (Delete)")
             print("0. 離開")
-
             choice = self._get_input("請選擇: ")
             if choice == "1":
                 self.list_my_games()
             elif choice == "2":
                 self.upload_game()
+            elif choice == "3":
+                self.delete_game()
             elif choice == "0" or choice is None:
                 break
 
@@ -210,5 +293,4 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=10002)
     args = parser.parse_args()
-
     DeveloperClient(args.host, args.port).run()

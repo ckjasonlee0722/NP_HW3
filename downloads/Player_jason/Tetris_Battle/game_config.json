@@ -1,7 +1,7 @@
 {
     "meta": {
         "game_name": "Tetris_Battle",
-        "version": "1.0.0",
+        "version": "1.0.10",
         "author": "XiaoBango",
         "description": "經典雙人俄羅斯方塊對戰",
         "min_players": 2,

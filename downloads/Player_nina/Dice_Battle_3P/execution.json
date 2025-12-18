@@ -1,0 +1,26 @@
+{
+  "size": 7137,
+  "version": "1.0.11",
+  "execution": {
+    "server": {
+      "script": "server.py",
+      "arguments": {
+        "port": "--port",
+        "users": "--users"
+      },
+      "custom_args": {
+        "host": "0.0.0.0"
+      }
+    },
+    "client": {
+      "script": "client.py",
+      "arguments": {
+        "host": "--host",
+        "port": "--port",
+        "user_id": "--user-id"
+      }
+    }
+  },
+  "min_players": 3,
+  "max_players": 3
+}

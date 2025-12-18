@@ -1,8 +1,9 @@
 {
-  "size": 3318,
-  "version": "1.0.12",
+  "size": 3845,
+  "version": "1.0.3",
   "execution": {
     "server": {
+      "executable": "python",
       "script": "server.py",
       "arguments": {
         "port": "--port",
@@ -13,11 +14,13 @@
       }
     },
     "client": {
+      "executable": "python",
       "script": "client.py",
       "arguments": {
-        "host": "--host",
+        "ip": "--host",
         "port": "--port",
-        "user_id": "--user-id"
+        "user_id": "--user-id",
+        "role": "--role"
       }
     }
   },

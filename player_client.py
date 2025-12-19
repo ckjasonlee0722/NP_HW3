@@ -540,8 +540,14 @@ class PlayerClient:
             print(f"[系統] 啟動遊戲: {game_name}")
             print(f"[DEBUG] 執行參數: {args}")
 
-            subprocess.Popen(args, cwd=game_dir,
-                             creationflags=subprocess.CREATE_NEW_CONSOLE)
+            # === [修正點 3] 跨平台相容性修改 (關鍵！) ===
+            kwargs = {}
+            if sys.platform == 'win32':
+                kwargs['creationflags'] = subprocess.CREATE_NEW_CONSOLE
+
+            subprocess.Popen(args, cwd=game_dir, **kwargs)
+            # ==========================================
+
         except Exception as e:
             print(f"[錯誤] {e}")
             input("按 Enter 繼續...")

@@ -1,6 +1,9 @@
 # NP_HW3
 A course I took in fall semester 2025
 
+ Player client 連線: python player_client.py --host 127.0.0.1 --port 33002
+ Developer client 連線: python developer_client.py --host 127.0.0.1 --port 33002
+
 🎮 Network Programming HW3 - Online Game Platform
 這是一個基於 Socket 的線上遊戲平台，包含大廳系統、會員機制、遊戲商城以及多款連線遊戲（Click War, Tetris Battle）。
 

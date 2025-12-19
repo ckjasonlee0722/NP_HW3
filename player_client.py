@@ -540,8 +540,12 @@ class PlayerClient:
             print(f"[系統] 啟動遊戲: {game_name}")
             print(f"[DEBUG] 執行參數: {args}")
 
-            subprocess.Popen(args, cwd=game_dir,
-                             creationflags=subprocess.CREATE_NEW_CONSOLE)
+            if sys.platform == "win32":
+                subprocess.Popen(args, cwd=game_dir,
+                                 creationflags=subprocess.CREATE_NEW_CONSOLE)
+            else:
+                # On macOS and Linux, run normally
+                subprocess.Popen(args, cwd=game_dir)
         except Exception as e:
             print(f"[錯誤] {e}")
             input("按 Enter 繼續...")

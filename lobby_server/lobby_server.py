@@ -83,8 +83,12 @@ class GameExecutor:
         print(f"[Executor] Launching: {' '.join(map(str, cmd))}")
 
         if IS_WINDOWS:
-            proc = subprocess.Popen(
-                cmd, cwd=game_cwd, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            try:
+                proc = subprocess.Popen(
+                    cmd, cwd=game_cwd, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            except AttributeError:
+                # Fallback if CREATE_NEW_CONSOLE is not available
+                proc = subprocess.Popen(cmd, cwd=game_cwd)
         else:
             # Linux: 使用 nohup 概念或直接背景執行
             proc = subprocess.Popen(

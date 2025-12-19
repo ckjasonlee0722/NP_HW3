@@ -1,7 +1,7 @@
 # NP_HW3
 A course I took in fall semester 2025
 
- Player client 連線: python player_client.py --host 127.0.0.1 --port 33002
+ Player client 連線: python player_client.py --host 192.168.1.107 --port 33002 
  Developer client 連線: python developer_client.py --host 127.0.0.1 --port 33002
 
 🎮 Network Programming HW3 - Online Game Platform

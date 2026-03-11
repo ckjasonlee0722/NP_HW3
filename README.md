@@ -1,80 +1,123 @@
-# 🎮 Network Programming HW3 - Online Game Platform
+# 🎮 Network Programming HW3 — Online Game Platform
 
-A Socket-based online multiplayer game platform developed for the Network Programming course (Fall 2025). This platform features a centralized lobby system, user authentication, a game store, and multiplayer networking for games like *Click War* and *Tetris Battle*.
+> A Socket-based online multiplayer game platform featuring a centralized lobby system, user authentication, a game store, and multiplayer networking for **Click War** and **Tetris Battle**.
+>
+> *Network Programming Course — Fall 2025*
+
+---
 
 ## 📋 Prerequisites
-* **Python:** 3.10 or higher
-* **Libraries:** `pygame` (required for game rendering)
 
+- **Python** 3.10 or higher
+- **pygame** library (required for game rendering)
+```bash
 pip install pygame
-🚀 Quick Start (How to Run Client)
-Because the server is deployed on the university's Linux workstation (linux1) and restricted by a firewall, this project utilizes SSH Tunneling to bypass random port restrictions.
+```
 
-⚠️ Crucial Step: You must establish the SSH tunnel before launching the client, otherwise, you will not be able to connect to the game server.
+---
 
-Step 1: Establish SSH Tunneling (建立 SSH 雙通道)
-Open a terminal (Terminal / PowerShell) and execute the following command to forward the local ports for the Lobby (33002) and Game Servers (33003-33005) to the remote server.
-(Note: Replace <your_student_id> with your actual linux1 login account if you are not hslee)
+## 🚀 Quick Start
 
-Bash
-ssh -L 33002:127.0.0.1:33002 -L 33003:127.0.0.1:33003 -L 33004:127.0.0.1:33004 -L 33005:127.0.0.1:33005 hslee@linux1.cs.nycu.edu.tw
-Important: After successfully logging in with your password, keep this terminal window open. Closing it will terminate the connection tunnel.
+> [!IMPORTANT]
+> Because the server is deployed on the university's Linux workstation (`linux1`) and restricted by a firewall, this project uses **SSH Tunneling** to bypass port restrictions.
+> You **must** establish the SSH tunnel before launching the client, otherwise you will not be able to connect to the game server.
 
-Step 2: Launch the Player Client (啟動遊戲客戶端)
-Open a new terminal window and connect to the platform using the local forwarded port:
+### Step 1 — Establish SSH Tunneling
 
-Bash
+Open a terminal and run the following command to forward local ports for the Lobby (`33002`) and Game Servers (`33003–33005`) to the remote server.
+
+> **Note:** Replace `<your_student_id>` with your actual linux1 login account if you are not `hslee`.
+```bash
+ssh -L 33002:127.0.0.1:33002 \
+    -L 33003:127.0.0.1:33003 \
+    -L 33004:127.0.0.1:33004 \
+    -L 33005:127.0.0.1:33005 \
+    hslee@linux1.cs.nycu.edu.tw
+```
+
+> **⚠️ Important:** After logging in, **keep this terminal window open**. Closing it will terminate the tunnel.
+
+---
+
+### Step 2 — Launch the Player Client
+
+Open a **new** terminal window and connect to the platform:
+```bash
 python player_client.py --host 127.0.0.1 --port 33002
-Step 3: Start Playing!
-Register/Login: Enter any username and password to register.
+```
 
-Game Store: Browse and download Click_War or Tetris_Battle.
+---
 
-Create a Room: Select a downloaded game and set the player capacity (2 players recommended for testing).
+### Step 3 — Start Playing
 
-Join a Room: Open another client (repeat Step 2) to join the newly created room.
+| Step | Action |
+|------|--------|
+| **Register / Login** | Enter any username and password to register |
+| **Game Store** | Browse and download `Click_War` or `Tetris_Battle` |
+| **Create a Room** | Select a downloaded game and set player capacity (2 recommended) |
+| **Join a Room** | Open another client (repeat Step 2) to join the room |
 
-🛠️ Developer Tools (開發者工具)
-If you need to upload new game archive files (.zip) to the server, use the developer client:
+---
 
+## 🛠️ Developer Tools
+
+To upload new game archive files (`.zip`) to the server, use the developer client:
+```bash
 python developer_client.py --host 127.0.0.1 --port 33002
-Supported Features: Upload games, remove games, and view the current game list.
+```
 
-⚙️ Server Deployment Info
-The main servers are currently deployed and running on the NYCU CS workstation:
+**Supported features:**
+- Upload games
+- Remove games
+- View the current game list
 
-Host: linux1.cs.nycu.edu.tw (140.113.235.151)
+---
 
-Process Owner: hslee
+## ⚙️ Server Deployment Info
 
-Ports:
+The main servers are deployed and running on the NYCU CS workstation:
 
-Database Server: 33001
+| Field | Value |
+|-------|-------|
+| **Host** | `linux1.cs.nycu.edu.tw` (`140.113.235.151`) |
+| **Process Owner** | `hslee` |
+| **Database Server** | Port `33001` |
+| **Lobby Server** | Port `33002` |
+| **Game Servers** | Ports `33003` – `33005` *(Fixed for Tunneling)* |
 
-Lobby Server: 33002
+---
 
-Game Servers: 33003 - 33005 (Fixed Ports for Tunneling)
+## 🖥️ Running a Local Server
 
-🖥️ Running a Local Server (自行架設 Server)
-If you wish to host the server entirely on your local machine for development, run the following commands in separate terminals:
+To host the server on your local machine for development, run the following in **separate terminals**:
 
-Bash
-# 1. Start the Database Server
+**1. Start the Database Server**
+```bash
 python db_server/db_server.py --port 33001
+```
 
-# 2. Start the Lobby Server
-# Note: Set public-host to 127.0.0.1 for local testing
+**2. Start the Lobby Server**
+
+> **Note:** Set `--public-host` to `127.0.0.1` for local testing.
+```bash
 export PYTHONPATH=$PYTHONPATH:.
-python lobby_server/lobby_server.py --port 33002 --dbhost 127.0.0.1 --dbport 33001 --public-host 127.0.0.1
-📂 Project Structure
-Plaintext
+python lobby_server/lobby_server.py --port 33002 \
+    --dbhost 127.0.0.1 --dbport 33001 \
+    --public-host 127.0.0.1
+```
+
+---
+
+## 📂 Project Structure
+```
 .
 ├── client.py               # Generic game client logic
 ├── server.py               # Generic game server logic
 ├── player_client.py        # Main entry point for players (Lobby Client)
 ├── developer_client.py     # Developer tool for game management
-├── utils/                  # Network protocol modules
-│   └── protocol.py
+├── utils/
+│   └── protocol.py         # Network protocol modules
 ├── downloads/              # Local storage for downloaded games
-├── games/                  # Source code for games (Click_War, Tetris_Battle)
+├── games/                  # Source code (Click_War, Tetris_Battle)
 └── README.md
+```

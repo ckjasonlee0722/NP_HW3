@@ -1,5 +1,4 @@
 # lobby_server/lobby_server.py
-from utils.protocol import send_message, recv_message, recv_file, send_file
 import argparse
 import socket
 import threading
@@ -10,7 +9,9 @@ import zipfile
 import random
 import time
 
+# 讓 `python lobby_server/lobby_server.py` 不需設定 PYTHONPATH 也能 import utils
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.protocol import send_message, recv_message, recv_file, send_file  # noqa: E402
 
 # 判斷是否為 Windows
 IS_WINDOWS = os.name == 'nt'
@@ -238,6 +239,11 @@ def handle_client(conn, addr, args):
                                     args.public_host, args.dbhost, args.dbport
                                 )
                                 time.sleep(1.5)
+
+                                # 記錄遊玩紀錄，玩過的人才能評論
+                                call_db(args.dbhost, args.dbport, {
+                                    "action": "record_play",
+                                    "data": {"user_ids": users, "game_name": game_meta.get("name")}})
 
                                 start_packet = {
                                     "status": "success",

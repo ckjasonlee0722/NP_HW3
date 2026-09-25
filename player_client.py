@@ -389,7 +389,7 @@ class PlayerClient:
                 print("[錯誤] 找不到該房間 ID 或房間已關閉")
                 return
 
-            # === [修正點 1] 檢查本地是否已安裝該遊戲 ===
+            # 檢查本地是否已安裝該遊戲
             if not self._get_installed_version(target_game):
                 print(f"\n[錯誤] 你的電腦尚未安裝遊戲 '{target_game}'！")
                 print("       請先至 [1. 瀏覽商城] 下載該遊戲後再嘗試加入。")
@@ -476,7 +476,7 @@ class PlayerClient:
         game_dir = os.path.abspath(game_dir)
         config_path = os.path.join(game_dir, "execution.json")
 
-        # === [修正點 2] 增強錯誤檢查與暫停提示 ===
+        # 設定檔或腳本缺失時先暫停，讓玩家看得到錯誤訊息
         if not os.path.exists(config_path):
             print(f"\n[嚴重錯誤] 找不到遊戲設定檔！")
             print(f"預期路徑: {config_path}")
@@ -523,7 +523,7 @@ class PlayerClient:
                 idx = [str(u) for u in users].index(str(self.user_id))
                 my_role = f"P{idx+1}"
 
-            # [重要修正] 同時提供 "ip" 和 "host" 以相容不同設定檔
+            # 同時提供 "ip" 和 "host" 以相容不同設定檔
             runtime = {
                 "ip": server_host,
                 "host": server_host,
@@ -540,13 +540,12 @@ class PlayerClient:
             print(f"[系統] 啟動遊戲: {game_name}")
             print(f"[DEBUG] 執行參數: {args}")
 
-            # === [修正點 3] 跨平台相容性修改 (關鍵！) ===
+            # Windows 開新視窗執行，macOS / Linux 直接執行
             kwargs = {}
             if sys.platform == 'win32':
                 kwargs['creationflags'] = subprocess.CREATE_NEW_CONSOLE
 
             subprocess.Popen(args, cwd=game_dir, **kwargs)
-            # ==========================================
 
         except Exception as e:
             print(f"[錯誤] {e}")

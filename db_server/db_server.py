@@ -47,20 +47,17 @@ class SimpleStorage:
             "rooms": [],
             "games": [],
             "reviews": [],
-            # [新增] {username: [game_name1, game_name2, ...]}
+            # {username: [game_name1, game_name2, ...]}
             "play_history": {},
             "nexts": {"player": 1, "developer": 1, "room": 1}
         }
         self.load()
-
-    # db_server/db_server.py (約 60 行附近)
 
     def load(self):
         if os.path.exists(self.db_path):
             try:
                 with open(self.db_path, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
-                    # ... (原本的載入邏輯) ...
                     for k in self.data.keys():
                         if k in loaded:
                             self.data[k] = loaded[k]
@@ -69,10 +66,9 @@ class SimpleStorage:
                 if isinstance(self.data.get("play_history"), list):
                     self.data["play_history"] = {}
 
-                # === [新增] 強制重置所有玩家為離線 ===
+                # 重啟後所有玩家一律視為離線
                 for p in self.data["players"]:
                     p["online"] = False
-                # ====================================
 
                 print(
                     f"[Storage] Loaded DB from {self.db_path} (All users reset to offline)")
@@ -169,7 +165,7 @@ class SimpleStorage:
             target = next(
                 (g for g in self.data["games"] if g["name"] == name), None)
 
-            # [修正 D2] 檢查作者權限
+            # 只有原作者可以更新同名遊戲
             if target:
                 if target.get("author") != meta.get("author"):
                     print(
@@ -211,14 +207,14 @@ class SimpleStorage:
     def game_get(self, name):
         return next((g for g in self.data["games"] if g["name"] == name), None)
 
-    # --- [新增 P4] 評論系統 ---
+    # --- 評論系統 ---
     def review_add(self, game_name, username, rating, comment):
         with self.lock:
             # 1. 確認遊戲存在
             if not any(g["name"] == game_name for g in self.data["games"]):
                 return {"status": "error", "message": "Game not found"}
 
-            # 2. [新增] 確認是否有遊玩紀錄
+            # 2. 確認是否有遊玩紀錄
             history = self.data["play_history"].get(username, [])
             if game_name not in history:
                 return {"status": "error", "message": "You must play this game before reviewing."}
@@ -246,8 +242,6 @@ class SimpleStorage:
         return targets
 
     # --- 房間相關 ---
-    # db_server.py 的 room_create 函式
-    # db_server.py 的 room_create 函式
     def room_create(self, d):
         with self.lock:
             rid = self.data["nexts"]["room"]
@@ -259,7 +253,7 @@ class SimpleStorage:
                     host_name = p["username"]
                     break
 
-            # [新增] 讀取 max_players，預設為 2
+            # 讀取 max_players，預設為 2
             max_players = d.get("max_players", 2)
 
             r = {
@@ -312,14 +306,9 @@ def handle_client(conn, addr, storage):
         data = req.get("data") or {}
         resp = None
 
-        # ... (Auth & Game & Review & Room 路由保持不變) ...
-        # 請在原本的 if/elif 結構中加入這條：
-
-        if act == "record_play":  # [新增路由]
+        if act == "record_play":
             resp = storage.record_play(
                 data.get("user_ids"), data.get("game_name"))
-
-        # --- 以下是原本的路由 (為了完整性列出上下文，請將這段融合進去) ---
         elif act == "auth_register":
             resp = storage.register(data.get("username"), data.get(
                 "password"), data.get("role", "player"))

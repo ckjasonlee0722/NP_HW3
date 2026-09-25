@@ -169,7 +169,7 @@ class DeveloperClient:
 
         return True, config
 
-    # [新增] 版本號自動增加邏輯
+    # 版本號自動遞增
     def _increment_version(self, version_str):
         try:
             parts = version_str.split('.')
@@ -200,7 +200,7 @@ class DeveloperClient:
         config = result
         current_ver = config["meta"]["version"]
 
-        # [新增] 詢問自動更新版本
+        # 詢問是否自動更新版本
         next_ver = self._increment_version(current_ver)
         print(f"\n目前版本: v{current_ver}")
         ask = self._get_input(f"是否自動更新版本至 v{next_ver}? (Y/n): ").lower()
